@@ -1,0 +1,32 @@
+name: Deploy LambdaStack
+
+permissions:
+  id-token: write # Required for GitHub to be able to create a token for you to authenticate with AWS
+  contents: read  # Permits your action to read this repo.
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy_lambda_stack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE }}
+          aws-region: ${{ vars.AWS_TARGET_REGION }}
+          role-session-name: "GitHubActions-DeployLayerStack"
+
+      - name: Deploy LambdaStack (via CDK)
+        uses: youyo/aws-cdk-github-actions@v2
+        with:
+          cdk_subcommand: 'deploy'
+          cdk_stack: 'LambdaStack'
+          cdk_args: '--require-approval never' # This is a toy example, so we don't need to approve changes
+          actions_comment: false
