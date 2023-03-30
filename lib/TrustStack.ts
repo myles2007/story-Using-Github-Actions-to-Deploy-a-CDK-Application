@@ -2,14 +2,20 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as iam from "aws-cdk-lib/aws-iam";
 
+// You can use the AWS CDK CLI to deploy this stack with the following command:
+// cdk deploy --parameters GitHubOrg=<org> --parameters GitHubRepo=<repo>
 export class TrustStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // -- Parameters you will need to provide at deploy time. --
     // This stack is parameterized so that you can use it without modification.
-    // You can use the AWS CDK CLI to deploy this stack with the following command:
-    // cdk deploy --parameters GitHubOrg=<your-org> --parameters GitHubRepo=<your-repo>
+    // These values are used to scope the access of the GitHub Actions role
+    // to your specific repository.
+    //
+    // IMPORTANT: This stack will only trust your repository's main branch.
+    //            This can be changed by modifying the `StringLike` condition
+    //            in the `githubActionsRole` definition below.
     const githubOrg = new cdk.CfnParameter(this, "GitHubOrg", {
       type: "String",
       description: "The GitHub organization that owns the repository.",
@@ -20,23 +26,26 @@ export class TrustStack extends cdk.Stack {
     });
 
     // -- Defines an OpenID Connect (OIDC) provider for GitHub Actions. --
-    // This provider will be used by the GitHub Actions workflow to assume a role
-    // which can be used to deploy the CDK application.
+    // This provider will be used by the GitHub Actions workflow to
+    // assume a role which can be used to deploy the CDK application.
     const githubProvider = new iam.CfnOIDCProvider(this, "GitHubOIDCProvider", {
-      thumbprintList: ["6938fd4d98bab03faadb97b34396831e3780aea1"], // See below
-      url: "https://token.actions.githubusercontent.com", // You will only be able to create one OIDC provider with this URL.
-      clientIdList: ["sts.amazonaws.com"], // This value tells AWS the token is intended for STS.
+      thumbprintList: ["6938fd4d98bab03faadb97b34396831e3780aea1"],
+      url: "https://token.actions.githubusercontent.com", // <-- 1 per account
+      clientIdList: ["sts.amazonaws.com"], // <-- Tokens are intended for STS
     });
     // See: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services#adding-the-identity-provider-to-aws
     // Thumbprint from: https://github.blog/changelog/2022-01-13-github-actions-update-on-oidc-based-deployments-to-aws/
     //    ^--- This value can be calculated, but it won't change regularly.
-    //         You can also retrieve by providing starting the provider creation process in the AWS Console
-    //         and using the "Get thumbprint" button after selecting OpenID Connect as the type and inputting
-    //         the provider URL.
+    //         You can also retrieve by providing starting the provider
+    //         creation process in the AWS Console and using the
+    //         "Get thumbprint" button after selecting OpenID Connect
+    //         as the type and inputting the provider URL.
 
     // -- Defines a role that can be assumed by GitHub Actions. --
-    // This role will be used by the GitHub Actions workflow to deploy the stack.
-    // It is assumable only by GitHub Actions running against the `main` branch
+    // This role will be used by the GitHub Actions workflow to deploy
+    // the stack. It is assumable only by GitHub Actions running against
+    // the `main` branch. The branch can be changed by replacing `main`
+    // in the `ref:refs/heads/main` value below.
     const githubActionsRole = new iam.Role(this, "GitHubActionsRole", {
       assumedBy: new iam.FederatedPrincipal(
         githubProvider.attrArn,
@@ -54,15 +63,23 @@ export class TrustStack extends cdk.Stack {
             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           },
         },
-        "sts:AssumeRoleWithWebIdentity" // <-- Permits assuming roles with an OIDC identity
+        "sts:AssumeRoleWithWebIdentity" // <-- Allows use of OIDC identity
       ),
     });
 
-    // -- A policy to permit assumption of the default AWS CDK roles created by its bootstrap process. --
-    // Allows assuming roles tagged with an aws-cdk:bootstrap-role tag of certain
-    // values (file-publishing, lookup, deploy) which permit the CDK application to
-    // look up existing values, publish assets, and create CloudFormation changesets.
-    const assumeCdkDeploymentRoles = new iam.PolicyStatement({
+    // -- A policy to permit assumption of the default AWS CDK roles. --
+    // Allows assuming roles tagged with an aws-cdk:bootstrap-role tag of
+    // certain values (file-publishing, lookup, deploy) which permit the CDK
+    // application to look up existing values, publish assets, and create
+    // CloudFormation changesets. These roles are created by CDK's
+    // bootstrapping process. See:
+    // https://docs.aws.amazon.com/cdk/latest/guide/bootstrapping.html
+    //
+    // WARNING: The CDK `deploy` role allows the CDK to execute changes via
+    //          CloudFormation with its execution role. The execution role
+    //          has full administrative permissions. It can only be assumed
+    //          by CloudFormation, but you should still be aware.
+      const assumeCdkDeploymentRoles = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ["sts:AssumeRole"],
       resources: ["arn:aws:iam::*:role/cdk-*"],
@@ -77,14 +94,15 @@ export class TrustStack extends cdk.Stack {
       },
     });
 
-    // Add the policy statement to the GitHub Actions role so it can actually assume
-    // the CDK deployment roles it will require.
+    // Add the policy statement to the GitHub Actions role so it can actually
+    // assume the CDK deployment roles it will require.
     githubActionsRole.addToPolicy(assumeCdkDeploymentRoles);
 
     new cdk.CfnOutput(this, "GitHubActionsRoleArn", {
       value: githubActionsRole.roleArn,
-      description:
-        "The ARN for role that should be assumed by the GitHub Action which deploys your application.",
+      description: (
+        "The role ARN for GitHub Actions to use during deployment."
+      )
     });
   }
 }
