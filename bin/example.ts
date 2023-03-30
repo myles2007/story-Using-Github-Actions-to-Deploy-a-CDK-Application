@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
 import { TrustStack } from "../lib/TrustStack";
 import { LambdaStack } from "../lib/LambdaStack";
