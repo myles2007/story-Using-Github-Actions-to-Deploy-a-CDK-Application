@@ -8,8 +8,8 @@ export class LambdaStack extends cdk.Stack {
 
     const myFunction = new lambda.Function(this, "Lambda", {
       runtime: lambda.Runtime.PYTHON_3_9,
-      code: lambda.Code.fromAsset("src"),
-      handler: "hello_world.handler",
+      code: lambda.Code.fromInline(`def handler(event, context): return "Hello, world!"`),
+      handler: "index.handler"
     })
 
     // WARNING: This function can be invoked without authentication.
