@@ -8,7 +8,7 @@ export class LambdaStack extends cdk.Stack {
 
     const myFunction = new lambda.Function(this, "Lambda", {
       runtime: lambda.Runtime.PYTHON_3_9,
-      code: lambda.Code.fromInline(`def handler(event, context): return "Hello, world!"`),
+      code: lambda.Code.fromInline(`def handler(event, context): return "Hello again, world!"`),
       handler: "index.handler"
     })
 
