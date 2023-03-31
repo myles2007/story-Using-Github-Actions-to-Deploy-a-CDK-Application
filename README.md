@@ -6,4 +6,4 @@ The project structure is reflective of `cdk init app --languge=typescript` and d
  - An OIDC Provider in IAM which will permit GitHub Actions to assume a specific role.
  - A simple Lambda function which will be deployed as an example.
 
-Please see my article as a guide for using the contents of this repository.
+Please see [my Medium story](https://medium.com/@mylesloffler/using-github-actions-to-deploy-a-cdk-application-f28b7f792f12#a16e) as a guide for using the contents of this repository.
